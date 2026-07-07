@@ -1,0 +1,10 @@
+[project]
+name = "dfu-app"
+version = "0.1.0"
+dependencies = [
+    "tensorflow>=2.21.0rc1",
+    "pillow",
+]
+
+[tool.uv]
+prerelease = "allow"
