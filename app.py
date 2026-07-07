@@ -45,17 +45,22 @@ if uploaded_file is not None:
         # --- 5. PREDICT USING ONNX ---
         with st.spinner('Running CNN...'):
             input_name = session.get_inputs()[0].name
-            outputs = session.run(None, {input_name: img_array})[0]
-            
         # --- 6. INTERPRET RESULT ---
-        # ONNX outputs a 2D array, e.g., [[0.12, 0.88]] for 2 classes
-        prediction_prob = outputs[0][1] # Probability of Class 1 (Normal)
+        # Sigmoid outputs a single value: [[prob]]
+        # Because classes are sorted alphabetically by Keras, 
+        # 0.0 = Abnormal, 1.0 = Normal
+        prob = outputs[0][0][0] 
         
-        if prediction_prob < 0.5:
-            predicted_class = class_names[0]
-            confidence = (1 - prediction_prob) * 100
+        if prob < 0.5:
+            predicted_class = class_names[0] # Abnormal
+            confidence = (1 - prob) * 100
             st.error(f"**Prediction:** {predicted_class}")
         else:
+            predicted_class = class_names[1] # Normal
+            confidence = prob * 100
+            st.success(f"**Prediction:** {predicted_class}")
+            
+        st.info(f"**Model Confidence:** {confidence:.2f}%")
             predicted_class = class_names[1]
             confidence = prediction_prob * 100
             st.success(f"**Prediction:** {predicted_class}")
