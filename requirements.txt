@@ -1,2 +1,2 @@
-onnxruntime
+tflite-runtime
 pillow
