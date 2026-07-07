@@ -1,34 +1,27 @@
 import streamlit as st
-import tensorflow as tf
-from tensorflow.keras.applications.efficientnet import preprocess_input
-from PIL import Image
+import onnxruntime as rt
 import numpy as np
+from PIL import Image
+from tensorflow.keras.applications.efficientnet import preprocess_input
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="DFU Classifier", page_icon="🩺", layout="centered")
-
-# --- 2. LOAD THE MODEL ---
-# @st.cache_resource ensures the model only loads into memory once, making the app fast
+# --- 1. LOAD THE ONNX MODEL ---
 @st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model('dfu_cnn_model.keras')
-    return model
+    # Load the ONNX model instead of Keras
+    session = rt.InferenceSession('dfu_model.onnx')
+    return session
 
-model = load_model()
-
-# These MUST match the exact names from your Kaggle training output
-# (image_dataset_from_directory sorts alphabetically)
+session = load_model()
 class_names = ['Abnormal(Ulcer)', 'Normal(Healthy skin)']
 
-# --- 3. APP UI ---
+# --- 2. APP UI ---
+st.set_page_config(page_title="DFU Classifier", page_icon="🩺", layout="centered")
 st.title("🩺 Diabetic Foot Ulcer (DFU) Classifier")
 st.write("Upload a 224x224 patch image to check if it is **Normal** or **Abnormal**.")
 
-# File uploader (accepts jpg, png, jpeg)
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    # Display the uploaded image
     image = Image.open(uploaded_file)
     col1, col2 = st.columns(2)
     
@@ -38,23 +31,23 @@ if uploaded_file is not None:
     with col2:
         st.write("### Analyzing Image...")
         
-        # --- 4. PREPROCESS THE IMAGE ---
-        # 1. Resize to 224x224 (if it isn't already)
+        # --- 3. PREPROCESS ---
         img = image.resize((224, 224))
-        # 2. Convert to numpy array
-        img_array = np.array(img)
-        # 3. Add a batch dimension (model expects shape: [1, 224, 224, 3])
+        img_array = np.array(img, dtype=np.float32) # ONNX needs float32
         img_array = np.expand_dims(img_array, axis=0)
-        # 4. Apply the EXACT same preprocessing used during training
         img_array = preprocess_input(img_array)
         
-        # --- 5. MAKE PREDICTION ---
+        # --- 4. PREDICT USING ONNX ---
         with st.spinner('Running CNN...'):
-            # Predict returns a probability between 0 and 1 because of 'sigmoid'
-            prediction_prob = model.predict(img_array)[0][0]
+            # Get the input name from the ONNX model
+            input_name = session.get_inputs()[0].name
+            # Run inference
+            outputs = session.run(None, {input_name: img_array})[0]
             
-        # --- 6. INTERPRET RESULT ---
-        # 0.0 to 0.49 = Class 0 (Abnormal), 0.50 to 1.0 = Class 1 (Normal)
+        # --- 5. INTERPRET RESULT ---
+        # ONNX outputs a 2D array, e.g., [[0.12, 0.88]] for 2 classes
+        prediction_prob = outputs[0][1] # Probability of Class 1 (Normal)
+        
         if prediction_prob < 0.5:
             predicted_class = class_names[0]
             confidence = (1 - prediction_prob) * 100
