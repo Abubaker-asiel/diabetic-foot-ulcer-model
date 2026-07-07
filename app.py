@@ -1,20 +1,25 @@
 import streamlit as st
-import onnxruntime as rt
 import numpy as np
 from PIL import Image
+from tflite_runtime.interpreter import Interpreter
 
-# --- 1. LOAD THE ONNX MODEL ---
+# --- 1. LOAD THE TFLITE MODEL ---
 @st.cache_resource
 def load_model():
-    session = rt.InferenceSession('dfu_model.onnx')
-    return session
+    interpreter = Interpreter(model_path='dfu_model.tflite')
+    interpreter.allocate_tensors() # Required to initialize the model
+    return interpreter
 
-session = load_model()
+interpreter = load_model()
+
+# Get input and output details from the TFLite model
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
 class_names = ['Abnormal(Ulcer)', 'Normal(Healthy skin)']
 
 # --- 2. PURE NUMPY PREPROCESSING ---
 def preprocess_image(image):
-    # EfficientNet expects pixels scaled to [-1, 1] instead of [0, 255]
     img_array = np.array(image, dtype=np.float32)
     img_array = (img_array / 127.5) - 1.0
     return img_array
@@ -42,14 +47,17 @@ if uploaded_file is not None:
         img_array = np.expand_dims(img, axis=0)
         img_array = preprocess_image(img_array)
         
-        # --- 5. PREDICT USING ONNX ---
+        # --- 5. PREDICT USING TFLITE ---
         with st.spinner('Running CNN...'):
-            input_name = session.get_inputs()[0].name
-            outputs = session.run(None, {input_name: img_array})
+            # Set the image as the input tensor
+            interpreter.set_tensor(input_details[0]['index'], img_array)
+            # Run the inference
+            interpreter.invoke()
+            # Get the output tensor
+            output_data = interpreter.get_tensor(output_details[0]['index'])
             
         # --- 6. INTERPRET RESULT ---
-        # Sigmoid outputs a single value shape: [[prob]]
-        prob = outputs[0][0][0] 
+        prob = output_data[0][0] 
         
         if prob < 0.5:
             predicted_class = class_names[0]
