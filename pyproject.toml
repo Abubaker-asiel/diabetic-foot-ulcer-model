@@ -1,6 +1,7 @@
 [project]
 name = "dfu-app"
 version = "0.1.0"
+requires-python = ">=3.10"   # <--- ADD THIS LINE!
 dependencies = [
     "tensorflow>=2.21.0rc1",
     "pillow",
