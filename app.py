@@ -12,7 +12,7 @@ def load_model():
 session = load_model()
 class_names = ['Abnormal(Ulcer)', 'Normal(Healthy skin)']
 
-# --- 2. PURE NUMPY PREPROCESSING (Replaces TensorFlow's preprocess_input) ---
+# --- 2. PURE NUMPY PREPROCESSING ---
 def preprocess_image(image):
     # EfficientNet expects pixels scaled to [-1, 1] instead of [0, 255]
     img_array = np.array(image, dtype=np.float32)
@@ -38,31 +38,26 @@ if uploaded_file is not None:
         
         # --- 4. PREPROCESS ---
         img = image.resize((224, 224))
-        img = img.convert('RGB') # Ensure 3 channels even if image is PNG with transparency
+        img = img.convert('RGB')
         img_array = np.expand_dims(img, axis=0)
-        img_array = preprocess_image(img_array) # Use our math function instead of TF
+        img_array = preprocess_image(img_array)
         
         # --- 5. PREDICT USING ONNX ---
         with st.spinner('Running CNN...'):
             input_name = session.get_inputs()[0].name
+            outputs = session.run(None, {input_name: img_array})
+            
         # --- 6. INTERPRET RESULT ---
-        # Sigmoid outputs a single value: [[prob]]
-        # Because classes are sorted alphabetically by Keras, 
-        # 0.0 = Abnormal, 1.0 = Normal
+        # Sigmoid outputs a single value shape: [[prob]]
         prob = outputs[0][0][0] 
         
         if prob < 0.5:
-            predicted_class = class_names[0] # Abnormal
+            predicted_class = class_names[0]
             confidence = (1 - prob) * 100
             st.error(f"**Prediction:** {predicted_class}")
         else:
-            predicted_class = class_names[1] # Normal
-            confidence = prob * 100
-            st.success(f"**Prediction:** {predicted_class}")
-            
-        st.info(f"**Model Confidence:** {confidence:.2f}%")
             predicted_class = class_names[1]
-            confidence = prediction_prob * 100
+            confidence = prob * 100
             st.success(f"**Prediction:** {predicted_class}")
             
         st.info(f"**Model Confidence:** {confidence:.2f}%")
