@@ -1,13 +1,10 @@
-# Force Python 3.11 and correct architecture
+# Force Python 3.11
 FROM --platform=linux/amd64 python:3.11-slim
 
 WORKDIR /app
 
-# Use 'printf' instead of 'echo' to correctly create newlines!
-RUN printf "tensorflow\npillow\nstreamlit\n" > requirements.txt
-
-# Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install packages DIRECTLY, no requirements.txt needed
+RUN pip install --no-cache-dir tensorflow pillow streamlit
 
 # Copy your app code and model into the container
 COPY . .
